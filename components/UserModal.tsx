@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import type { User } from '../types';
+import type { UserProfile } from '../types';
 
 interface UserModalProps {
-    user: User | null;
+    user: UserProfile | null;
     onClose: () => void;
-    onSave: (user: User) => void;
+    onSave: (user: UserProfile) => void;
 }
 
 const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSave }) => {
-    const [formData, setFormData] = useState<Partial<User>>({
-        name: '',
+    const [formData, setFormData] = useState<Partial<UserProfile>>({
+        full_name: '',
         email: '',
-        password: '',
         role: 'User',
     });
 
@@ -20,14 +19,12 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSave }) => {
     useEffect(() => {
         if (user) {
             setFormData({
-                name: user.name,
+                full_name: user.full_name,
                 email: user.email,
                 role: user.role,
-                password: '', // Don't pre-fill password for security
             });
-        } else {
-            setFormData({ name: '', email: '', password: '', role: 'User' });
         }
+        // "Add User" is disabled for now, as it's handled by Supabase Auth page
     }, [user]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -37,16 +34,11 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSave }) => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isEditing && !formData.password) {
-            alert("Password is required for new users.");
-            return;
-        }
-        const userData: User = {
-            id: user?.id || '', // Handled by parent
-            name: formData.name || '',
-            email: formData.email || '',
+        const userData: UserProfile = {
+            id: user?.id || '',
+            full_name: formData.full_name || '',
+            email: user?.email || '', // Email is not editable here
             role: formData.role || 'User',
-            ... (formData.password && { password: formData.password }) // Only include password if set
         };
         onSave(userData);
     };
@@ -56,23 +48,17 @@ const UserModal: React.FC<UserModalProps> = ({ user, onClose, onSave }) => {
             <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-lg" onClick={e => e.stopPropagation()}>
                 <form onSubmit={handleSubmit}>
                     <div className="p-6 border-b border-slate-700">
-                        <h2 className="text-xl font-bold text-white">{isEditing ? 'Edit User' : 'Add New User'}</h2>
+                        <h2 className="text-xl font-bold text-white">{isEditing ? 'Edit User Profile' : 'Add New User'}</h2>
                     </div>
                     <div className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-1">Full Name</label>
-                                <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-1">Email Address</label>
-                                <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Email Address</label>
+                            <input type="email" name="email" value={formData.email} disabled className="w-full bg-slate-700/50 border border-slate-600 rounded-md p-2 text-slate-400 cursor-not-allowed"/>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-1">Password</label>
-                                <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder={isEditing ? 'Leave blank to keep unchanged' : ''} required={!isEditing} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                             <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Full Name</label>
+                                <input type="text" name="full_name" value={formData.full_name} onChange={handleChange} required className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-400 mb-1">Role</label>

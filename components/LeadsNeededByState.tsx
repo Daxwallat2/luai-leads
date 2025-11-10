@@ -14,19 +14,14 @@ const LeadsNeededByState: React.FC<LeadsNeededByStateProps> = ({ buyers }) => {
         const eligibleBuyers = buyers.filter(buyer => {
             if (buyer.status !== 'Active') return false;
             if (filter === 'All') return true;
-            if (filter === 'Qualified') return ['Qualified', 'Both'].includes(buyer.leadQualificationPreference);
-            if (filter === 'Not Qualified') return ['Not Qualified', 'Both'].includes(buyer.leadQualificationPreference);
-            return false;
+            return buyer.lead_qualification_preference === filter || buyer.lead_qualification_preference === 'Both';
         });
 
         for (const buyer of eligibleBuyers) {
-            const remainingCap = buyer.monthlyCap - buyer.leadsSentThisMonth;
+            const remainingCap = buyer.monthly_cap - buyer.leads_sent_this_month;
             if (remainingCap > 0) {
                 for (const state of buyer.markets) {
-                    if (!stateNeeds[state]) {
-                        stateNeeds[state] = 0;
-                    }
-                    stateNeeds[state] += remainingCap;
+                    stateNeeds[state] = (stateNeeds[state] || 0) + remainingCap;
                 }
             }
         }
@@ -39,9 +34,9 @@ const LeadsNeededByState: React.FC<LeadsNeededByStateProps> = ({ buyers }) => {
 
     return (
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 h-96 flex flex-col">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-3">
+            <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-white">Leads Needed By State</h3>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2">
                     <button onClick={() => setFilter('All')} className={`text-xs px-3 py-1 rounded-full ${filter === 'All' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>All</button>
                     <button onClick={() => setFilter('Qualified')} className={`text-xs px-3 py-1 rounded-full ${filter === 'Qualified' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Qualified</button>
                     <button onClick={() => setFilter('Not Qualified')} className={`text-xs px-3 py-1 rounded-full ${filter === 'Not Qualified' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Not Qualified</button>

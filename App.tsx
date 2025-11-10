@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Page, Lead, Buyer, DeliveryLog, User } from './types';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from './lib/supabaseClient';
+import type { Page, Lead, Buyer, DeliveryLog, UserProfile } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import Auth from './components/pages/Auth';
 import Dashboard from './components/pages/Dashboard';
 import Leads from './components/pages/Leads';
 import Buyers from './components/pages/Buyers';
@@ -12,63 +15,48 @@ import NewBuyerModal from './components/NewBuyerModal';
 import EditLeadModal from './components/EditLeadModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import UserModal from './components/UserModal';
-import WebhookSimulationModal from './components/WebhookSimulationModal';
 import UpdateLeadsSentModal from './components/UpdateLeadsSentModal';
-import { db, loadAndSeedDB } from './db';
 
 const BuyerLeadsModal: React.FC<{buyer: Buyer; leads: Lead[]; deliveryLogs: DeliveryLog[]; onClose: () => void;}> = ({ buyer, leads, deliveryLogs, onClose }) => {
-    // This component remains largely the same, no changes needed.
     const [qualificationFilter, setQualificationFilter] = useState<'All' | 'Qualified' | 'Not Qualified'>('All');
     const buyerLeads = React.useMemo(() => {
-        const deliveredLogEntries = deliveryLogs.filter(log => log.buyerId === buyer.id && log.status === 'Success');
+        const deliveredLogEntries = deliveryLogs.filter(log => log.buyer_id === buyer.id && log.status === 'Success');
         const leadMap = new Map(leads.map(lead => [lead.id, lead]));
-        return deliveredLogEntries.map(log => leadMap.get(log.leadId)).filter((lead): lead is Lead => lead !== undefined)
+        return deliveredLogEntries.map(log => leadMap.get(log.lead_id)).filter((lead): lead is Lead => lead !== undefined)
             .filter(lead => {
                 if (qualificationFilter === 'All') return true;
-                const isQualified = lead.status === 'Qualified';
-                if (qualificationFilter === 'Qualified') return isQualified;
-                if (qualificationFilter === 'Not Qualified') return !isQualified;
-                return true;
+                return lead.status === qualificationFilter;
             })
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
     }, [buyer, leads, deliveryLogs, qualificationFilter]);
+
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-4xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-bold text-white">Leads for {buyer.name} ({buyerLeads.length})</h2>
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className="text-sm text-slate-400">Filter by:</span>
-                            <button onClick={() => setQualificationFilter('All')} className={`text-xs px-3 py-1 rounded-full ${qualificationFilter === 'All' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>All</button>
-                            <button onClick={() => setQualificationFilter('Qualified')} className={`text-xs px-3 py-1 rounded-full ${qualificationFilter === 'Qualified' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Qualified</button>
-                            <button onClick={() => setQualificationFilter('Not Qualified')} className={`text-xs px-3 py-1 rounded-full ${qualificationFilter === 'Not Qualified' ? 'bg-brand-green text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Not Qualified</button>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+                    <h2 className="text-xl font-bold text-white">Leads for {buyer.name} ({buyerLeads.length})</h2>
                 </div>
                 <div className="p-4 flex-1 overflow-y-auto">
-                    {buyerLeads.length > 0 ? (
-                        <table className="w-full text-sm text-left text-slate-400">
-                             <thead className="text-xs text-slate-400 uppercase bg-slate-700/50 sticky top-0">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3">Name</th><th scope="col" className="px-6 py-3">Contact</th>
-                                    <th scope="col" className="px-6 py-3">Address</th><th scope="col" className="px-6 py-3">Source</th>
-                                    <th scope="col" className="px-6 py-3">Date</th>
+                     <table className="w-full text-sm text-left text-slate-400">
+                         <thead className="text-xs text-slate-400 uppercase bg-slate-700/50 sticky top-0">
+                            <tr>
+                                <th scope="col" className="px-6 py-3">Name</th>
+                                <th scope="col" className="px-6 py-3">Address</th>
+                                <th scope="col" className="px-6 py-3">Source</th>
+                                <th scope="col" className="px-6 py-3">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {buyerLeads.map(lead => (
+                                <tr key={lead.id} className="border-b border-slate-700 hover:bg-slate-700/50">
+                                    <td className="px-6 py-4 font-medium text-white whitespace-nowrap">{lead.name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{`${lead.street}, ${lead.city}, ${lead.state} ${lead.zip_code}`}</td>
+                                    <td className="px-6 py-4">{lead.source}</td>
+                                    <td className="px-6 py-4">{new Date(lead.created_at!).toLocaleDateString()}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {buyerLeads.map(lead => (
-                                    <tr key={lead.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                                        <td className="px-6 py-4 font-medium text-white whitespace-nowrap">{lead.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap"><div><span>{lead.email}</span><span className="text-slate-400 text-xs">{lead.phone}</span></div></td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{`${lead.street}, ${lead.city}, ${lead.state} ${lead.zipCode}`}</td>
-                                        <td className="px-6 py-4">{lead.source}</td><td className="px-6 py-4">{lead.date}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : (<div className="text-center py-16"><p className="text-slate-400">No leads match the current filter.</p></div>)}
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
                 <div className="p-4 border-t border-slate-700 flex justify-end">
                     <button onClick={onClose} className="bg-slate-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-slate-500 transition-colors">Close</button>
@@ -78,253 +66,211 @@ const BuyerLeadsModal: React.FC<{buyer: Buyer; leads: Lead[]; deliveryLogs: Deli
     );
 };
 
-// Create a mock user to bypass the login screen.
-const mockCurrentUser: User = {
-  id: 'u1',
-  name: 'Admin User',
-  email: 'admin@luaileads.dev',
-  role: 'Admin'
-};
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
   const [activePage, setActivePage] = useState<Page>('dashboard');
+  
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [deliveryLog, setDeliveryLog] = useState<DeliveryLog[]>([]);
   
   const [isBuyerModalOpen, setIsBuyerModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
   const [editingBuyer, setEditingBuyer] = useState<Buyer | null>(null);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [viewingBuyerLeads, setViewingBuyerLeads] = useState<Buyer | null>(null);
   const [editingBuyerLeadCount, setEditingBuyerLeadCount] = useState<Buyer | null>(null);
-  const [isProcessingCsv, setIsProcessingCsv] = useState(false);
+  
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [selectedBuyerIds, setSelectedBuyerIds] = useState<Set<string>>(new Set());
   const [deleteConfirmation, setDeleteConfirmation] = useState<{isOpen: boolean; itemType: string; count: number; onConfirm: () => void;}>
     ({ isOpen: false, itemType: 'item', count: 0, onConfirm: () => {} });
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (user: SupabaseUser) => {
     try {
-      const [loadedUsers, loadedLeads, loadedBuyers, loadedLogs] = await Promise.all([
-        db.getUsers(), db.getLeads(), db.getBuyers(), db.getDeliveryLogs()
+      const [
+          { data: profilesData, error: profilesError },
+          { data: leadsData, error: leadsError },
+          { data: buyersData, error: buyersError },
+          { data: logsData, error: logsError }
+      ] = await Promise.all([
+          supabase!.from('profiles').select('*'),
+          supabase!.from('leads').select('*'),
+          supabase!.from('buyers').select('*'),
+          supabase!.from('delivery_logs').select('*')
       ]);
-      setUsers(loadedUsers);
-      setLeads(loadedLeads);
-      setBuyers(loadedBuyers);
-      setDeliveryLog(loadedLogs);
+
+      if (profilesError) throw profilesError;
+      if (leadsError) throw leadsError;
+      if (buyersError) throw buyersError;
+      if (logsError) throw logsError;
+      
+      const userProfile = profilesData.find(p => p.id === user.id);
+      setCurrentUser(userProfile || null);
+
+      setUsers(profilesData as UserProfile[]);
+      setLeads(leadsData as Lead[]);
+      setBuyers(buyersData as Buyer[]);
+      setDeliveryLog(logsData as DeliveryLog[]);
+
     } catch (error) {
-      console.error("Failed to load data from DB:", error);
+      console.error("Failed to load data from Supabase:", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        await loadAndSeedDB();
-        await loadData();
-      } catch (error) {
-        console.error("Failed to initialize database and load data:", error);
-        // Ensure we don't get stuck on a loading screen if init fails
-        setIsLoading(false);
-      }
-    };
-    init();
+    if (!supabase) return;
 
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-        if (event.data && event.data.type === 'DATA_UPDATED') {
-            console.log('Data updated by service worker, reloading.');
-            loadData();
+    const getSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session?.user) {
+            await loadData(session.user);
+        } else {
+            setIsLoading(false);
         }
     };
-    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    getSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        if (session?.user) {
+            setIsLoading(true);
+            await loadData(session.user);
+        } else {
+            setCurrentUser(null);
+        }
+    });
+
+    return () => authListener.subscription.unsubscribe();
   }, [loadData]);
   
-  const handleCsvUpload = (file: File) => {
-    setIsProcessingCsv(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const csv = event.target?.result as string;
-        const lines = csv.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        const dataRows = lines.slice(1).map(line => {
-          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-          return headers.reduce((obj, header, index) => {
-            const key = header.toLowerCase().replace(/ \w/g, m => m[1].toUpperCase());
-            obj[key] = values[index];
-            return obj;
-          }, {} as Record<string, string>);
-        });
-        
-        for (const leadData of dataRows) {
-            await fetch(`/api/v1/webhooks/in/u-csv-upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(leadData)
-            });
-        }
-        alert(`${dataRows.length} leads are being processed via webhook. The UI will update as they complete.`);
-      } catch (error) {
-        console.error("Error processing CSV file:", error);
-        alert("Failed to process CSV file.");
-      } finally {
-        setIsProcessingCsv(false);
-      }
-    };
-    reader.readAsText(file);
-  };
-  
-  const handleSimulateWebhook = () => setIsWebhookModalOpen(true);
-  
-  const handleProcessWebhookPayload = async (payload: string) => {
-    try {
-        const response = await fetch(`/api/v1/webhooks/in/u-simulation`, {
+  const handleSimulateWebhook = async () => {
+     try {
+        const response = await fetch(`/api/webhook`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: payload
+            body: JSON.stringify({
+                name: "Simulated Lead",
+                email: `simulated-${Date.now()}@example.com`,
+                phone: "(555) 555-5555",
+                source: "Internal Simulation",
+                status: "Qualified",
+                address: "123 Awesome St, Austin, TX 78701"
+            })
         });
-        if (!response.ok) throw new Error('Webhook processing failed in service worker.');
-        
-        setIsWebhookModalOpen(false);
-        alert(`A new lead has been received and is being processed! The UI will update shortly.`);
-        setActivePage('leads');
+        if (!response.ok) throw new Error('Webhook simulation failed.');
+        alert('Webhook simulated successfully! Data will refresh.');
+        if (session?.user) await loadData(session.user);
     } catch (error) {
-        console.error("Error processing webhook payload:", error);
-        alert("Failed to process webhook payload. Please ensure it is valid JSON.");
+        console.error("Error simulating webhook:", error);
+        alert("Failed to simulate webhook.");
     }
   };
 
   const handleSaveBuyer = async (buyerToSave: Buyer) => {
-    if (editingBuyer) {
-        await db.putBuyer(buyerToSave);
-    } else {
-        const newBuyer: Buyer = {
-            ...buyerToSave,
-            id: `b${Date.now()}`,
-            leadsSentThisMonth: 0,
-            cycleStartDate: buyerToSave.cycleStartDate || new Date(new Date().setDate(1)).toISOString().split('T')[0]
-        };
-        await db.addBuyer(newBuyer);
-    }
-    await loadData();
+    const { data, error } = await (editingBuyer
+        ? supabase!.from('buyers').update(buyerToSave).eq('id', editingBuyer.id)
+        : supabase!.from('buyers').insert({ ...buyerToSave, user_id: session?.user?.id })
+    );
+    if (error) alert(error.message);
+    else if (session?.user) await loadData(session.user);
+    
     setIsBuyerModalOpen(false);
     setEditingBuyer(null);
   };
 
   const handleSaveLead = async (updatedLead: Lead) => {
-      await db.putLead(updatedLead);
-      await loadData();
+      const { error } = await supabase!.from('leads').update(updatedLead).eq('id', updatedLead.id);
+      if (error) alert(error.message);
+      else if (session?.user) await loadData(session.user);
       setEditingLead(null);
   };
 
-  const handleSaveUser = async (userToSave: User) => {
+  const handleSaveUser = async (userToSave: UserProfile) => {
+    // Note: User creation is handled by Supabase Auth. This only updates profile.
     if (editingUser) {
-        await db.putUser(userToSave);
-    } else {
-        const newUser: User = { ...userToSave, id: `u${Date.now()}` };
-        await db.addUser(newUser);
+        const { error } = await supabase!.from('profiles').update({ full_name: userToSave.full_name, role: userToSave.role }).eq('id', editingUser.id);
+        if (error) alert(error.message);
+        else if (session?.user) await loadData(session.user);
     }
-    await loadData();
     setIsUserModalOpen(false);
     setEditingUser(null);
   };
   
-  const handleDeleteUser = async (userId: string) => {
-    if (users.length <= 1) { alert("You cannot delete the only user."); return; }
-    if (mockCurrentUser?.id === userId) { alert("You cannot delete yourself."); return; }
-    setDeleteConfirmation({ isOpen: true, itemType: 'user', count: 1, onConfirm: async () => {
-        await db.deleteUser(userId);
-        await loadData();
-        setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
-    }});
-  };
-
   const handleDeleteSelectedLeads = () => {
     setDeleteConfirmation({ isOpen: true, itemType: 'lead', count: selectedLeadIds.size, onConfirm: async () => {
-        // Fix: Explicitly type `ids` as string[] to resolve TypeScript inference issue.
-        const ids: string[] = Array.from(selectedLeadIds);
-        await db.deleteLeads(ids);
-        await db.deleteLogsForLeads(ids);
-        setSelectedLeadIds(new Set());
-        await loadData();
+        const ids = Array.from(selectedLeadIds);
+        const { error } = await supabase!.from('leads').delete().in('id', ids);
+        if (error) alert(error.message);
+        else if (session?.user) {
+            setSelectedLeadIds(new Set());
+            await loadData(session.user);
+        }
         setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
     }});
   };
   
   const handleDeleteSelectedBuyers = () => {
       setDeleteConfirmation({ isOpen: true, itemType: 'buyer', count: selectedBuyerIds.size, onConfirm: async () => {
-          // Fix: Explicitly type `ids` as string[] to resolve TypeScript inference issue.
-          const ids: string[] = Array.from(selectedBuyerIds);
-          await db.deleteBuyers(ids);
-          await db.deleteLogsForBuyers(ids);
-          setSelectedBuyerIds(new Set());
-          await loadData();
+          const ids = Array.from(selectedBuyerIds);
+          const { error } = await supabase!.from('buyers').delete().in('id', ids);
+          if (error) alert(error.message);
+          else if (session?.user) {
+              setSelectedBuyerIds(new Set());
+              await loadData(session.user);
+          }
           setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
       }});
   };
   
-  const handleSimulateMonthEnd = async () => {
-    const updatedBuyers = buyers.map(b => ({ ...b, leadsSentThisMonth: 0 }));
-    await Promise.all(updatedBuyers.map(b => db.putBuyer(b)));
-    await loadData();
-    alert("Monthly lead counts for all buyers have been reset to 0.");
-  };
-
-  const handleSendTestLead = async (buyerId: string) => {
-    const buyer = buyers.find(b => b.id === buyerId);
-    if (!buyer || !buyer.webhookUrl) {
-      alert("This buyer does not have a webhook URL configured.");
-      return;
-    }
-    const testLeadPayload = {
-      name: 'Test Lead', email: 'test.lead@example.com', phone: '(555) 000-0000',
-      source: 'Internal Test', status: 'Not Qualified',
-      address: '123 Test St, Testville, CA 90210', notes: ['This is a test lead.']
-    };
-    await fetch(`/api/v1/webhooks/in/u-test-lead`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testLeadPayload)
-    });
-    alert(`Test lead sent to ${buyer.name}. Check the Delivery Log. The UI will update shortly.`);
-  };
-  
   const handleUpdateBuyerLeadsSent = async (buyerId: string, newCount: number) => {
-      const buyer = buyers.find(b => b.id === buyerId);
-      if (buyer) {
-        const updatedCount = Math.max(0, Math.min(buyer.monthlyCap, newCount));
-        await db.putBuyer({ ...buyer, leadsSentThisMonth: updatedCount });
-        await loadData();
-      }
+      const { error } = await supabase!.from('buyers').update({ leads_sent_this_month: newCount }).eq('id', buyerId);
+      if (error) alert(error.message);
+      else if (session?.user) await loadData(session.user);
       setEditingBuyerLeadCount(null);
   };
 
+  if (!supabase) {
+    return (
+        <div className="flex items-center justify-center min-h-screen text-red-400 text-center p-8 bg-slate-900">
+            <div>
+                <h2 className="text-2xl font-bold mb-4">Application Initialization Failed</h2>
+                <p className="text-slate-300">Could not connect to the backend service. Please ensure that the Supabase URL and Key are configured correctly in the Vercel environment variables.</p>
+            </div>
+        </div>
+    );
+  }
+
   if (isLoading) {
       return <div className="flex items-center justify-center min-h-screen"><p>Loading application...</p></div>;
+  }
+  
+  if (!session) {
+      return <Auth />;
   }
 
   return (
     <div className="flex bg-slate-900 text-white min-h-screen font-sans">
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <main className="flex-1 ml-64">
-        <Header title={activePage} user={mockCurrentUser} onLogout={() => { /* Logout disabled */ }} />
+        <Header title={activePage} user={currentUser} onLogout={() => supabase.auth.signOut()} />
         <div className="p-8">
           {
             {
               'dashboard': <Dashboard buyers={buyers} />,
-              'leads': <Leads leads={leads} onCsvUpload={handleCsvUpload} onEditLead={setEditingLead} isProcessing={isProcessingCsv} selectedLeadIds={selectedLeadIds} onSelectionChange={(id, sel) => setSelectedLeadIds(p => {const n=new Set(p); sel?n.add(id):n.delete(id); return n;})} onSelectAll={(sel) => setSelectedLeadIds(sel ? new Set(leads.map(l=>l.id)) : new Set())} onDeleteSelected={handleDeleteSelectedLeads} />,
-              'buyers': <Buyers buyers={buyers} onOpenModal={(b) => { setEditingBuyer(b); setIsBuyerModalOpen(true); }} onSimulateMonthEnd={handleSimulateMonthEnd} onViewDetails={setViewingBuyerLeads} onSendTestLead={handleSendTestLead} onUpdateLeadsSent={setEditingBuyerLeadCount} selectedBuyerIds={selectedBuyerIds} onSelectionChange={(id, sel) => setSelectedBuyerIds(p => {const n=new Set(p); sel?n.add(id):n.delete(id); return n;})} onSelectAll={(sel) => setSelectedBuyerIds(sel ? new Set(buyers.map(b=>b.id)) : new Set())} onDeleteSelected={handleDeleteSelectedBuyers}/>,
+              'leads': <Leads leads={leads} onEditLead={setEditingLead} selectedLeadIds={selectedLeadIds} onSelectionChange={(id, sel) => setSelectedLeadIds(p => {const n=new Set(p); sel?n.add(id):n.delete(id); return n;})} onSelectAll={(sel) => setSelectedLeadIds(sel ? new Set(leads.filter(l=>l.id).map(l=>l.id!)) : new Set())} onDeleteSelected={handleDeleteSelectedLeads} />,
+              'buyers': <Buyers buyers={buyers} onOpenModal={(b) => { setEditingBuyer(b); setIsBuyerModalOpen(true); }} onViewDetails={setViewingBuyerLeads} onUpdateLeadsSent={setEditingBuyerLeadCount} selectedBuyerIds={selectedBuyerIds} onSelectionChange={(id, sel) => setSelectedBuyerIds(p => {const n=new Set(p); sel?n.add(id):n.delete(id); return n;})} onSelectAll={(sel) => setSelectedBuyerIds(sel ? new Set(buyers.filter(b=>b.id).map(b=>b.id!)) : new Set())} onDeleteSelected={handleDeleteSelectedBuyers}/>,
               'delivery': <LeadDelivery deliveryLog={deliveryLog} leads={leads} buyers={buyers} />,
               'analytics': <Analytics />,
-              'settings': <Settings onSimulateWebhook={handleSimulateWebhook} users={users} onOpenUserModal={(u) => { setEditingUser(u); setIsUserModalOpen(true); }} onDeleteUser={handleDeleteUser}/>,
+              'settings': <Settings onSimulateWebhook={handleSimulateWebhook} users={users} onOpenUserModal={(u) => { setEditingUser(u); setIsUserModalOpen(true); }} />,
             }[activePage]
           }
         </div>
@@ -334,7 +280,6 @@ const App: React.FC = () => {
       {viewingBuyerLeads && <BuyerLeadsModal buyer={viewingBuyerLeads} leads={leads} deliveryLogs={deliveryLog} onClose={() => setViewingBuyerLeads(null)}/>}
       {editingLead && <EditLeadModal lead={editingLead} onClose={() => setEditingLead(null)} onSave={handleSaveLead} />}
       {deleteConfirmation.isOpen && (<ConfirmationModal isOpen={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation(p=>({...p,isOpen:false}))} onConfirm={deleteConfirmation.onConfirm} title={`Delete ${deleteConfirmation.itemType}(s)`} message={`Are you sure you want to delete ${deleteConfirmation.count} ${deleteConfirmation.itemType}(s)? This action cannot be undone.`}/>)}
-      {isWebhookModalOpen && <WebhookSimulationModal onClose={() => setIsWebhookModalOpen(false)} onProcess={handleProcessWebhookPayload} />}
       {editingBuyerLeadCount && <UpdateLeadsSentModal buyer={editingBuyerLeadCount} onClose={() => setEditingBuyerLeadCount(null)} onSave={handleUpdateBuyerLeadsSent}/>}
     </div>
   );
