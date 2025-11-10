@@ -1,6 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { DailyLeads, LeadsBySource } from '../types';
 
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 interface ParsedAddress {
     street: string;
     city: string;
@@ -8,15 +10,7 @@ interface ParsedAddress {
     zipCode: string;
 }
 
-export const parseAddressWithGemini = async (address: string, apiKey?: string): Promise<ParsedAddress> => {
-  const key = apiKey || process.env.API_KEY;
-  if (!key) {
-    console.error("Gemini API key is missing for address parsing.");
-    // Fallback to prevent a hard crash.
-    return { street: address, city: '', state: '', zipCode: '' };
-  }
-  const ai = new GoogleGenAI({ apiKey: key });
-  
+export const parseAddressWithGemini = async (address: string): Promise<ParsedAddress> => {
   const prompt = `Parse the following address into a structured JSON object with keys for "street", "city", "state", and "zipCode". The state should be the full state name. Address: "${address}"`;
   
   try {
@@ -51,14 +45,6 @@ export const parseAddressWithGemini = async (address: string, apiKey?: string): 
 
 
 export const generateAnalyticsSummary = async (dailyData: DailyLeads[], sourceData: LeadsBySource[]): Promise<string> => {
-  const key = process.env.API_KEY;
-  if (!key) {
-    const errorMsg = "An error occurred: The Gemini API key is missing from the environment.";
-    console.error(errorMsg);
-    return errorMsg;
-  }
-  const ai = new GoogleGenAI({ apiKey: key });
-
   const prompt = `
     You are a senior marketing analyst providing a summary for a lead generation dashboard.
     Based on the following data, generate a concise, insightful summary in markdown format.

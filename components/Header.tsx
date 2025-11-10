@@ -1,5 +1,5 @@
 import React from 'react';
-import { BellIcon } from './Icons';
+import { BellIcon, LogoutIcon } from './Icons';
 import type { User } from '../types';
 
 interface HeaderProps {
@@ -23,6 +23,9 @@ const Header: React.FC<HeaderProps> = ({ title, user, onLogout }) => {
             <p className="text-white font-semibold text-sm">{user?.name || 'Guest'}</p>
             <p className="text-slate-400 text-xs">{user?.role || ''}</p>
           </div>
+          <button onClick={onLogout} title="Logout" className="text-slate-400 hover:text-red-500">
+            <LogoutIcon className="h-5 w-5"/>
+          </button>
         </div>
       </div>
     </header>

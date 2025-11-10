@@ -3,16 +3,19 @@ import type { User } from '../../types';
 import { EditIcon, UserGroupIcon } from '../Icons';
 
 interface SettingsProps {
+    onSimulateWebhook: () => void;
     users: User[];
     onOpenUserModal: (user: User | null) => void;
     onDeleteUser: (userId: string) => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ users, onOpenUserModal, onDeleteUser }) => {
+const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUserModal, onDeleteUser }) => {
     const [copied, setCopied] = useState(false);
     
-    // This now reflects the real, deployable API endpoint URL.
-    const webhookUrl = useMemo(() => `${window.location.origin}/api/webhook`, []);
+    const webhookUrl = useMemo(() => {
+        // Construct a dynamic webhook URL that will be intercepted by the service worker
+        return `${window.location.origin}/api/v1/webhooks/in/u-AbCdEfG12345`;
+    }, []);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(webhookUrl).then(() => {
@@ -73,11 +76,15 @@ const Settings: React.FC<SettingsProps> = ({ users, onOpenUserModal, onDeleteUse
                  <div className="border-t border-slate-700 pt-8">
                     <h4 className="text-lg font-semibold text-white mb-4">Webhook Integration</h4>
                     
+                    <div className="bg-blue-500/10 border border-blue-500/30 text-blue-300 text-sm rounded-lg p-4 mb-6">
+                        <strong className="font-semibold">Live Backend Active:</strong> This application uses a Service Worker to simulate a live backend. The URL below is a functional endpoint within this browser session. You can send real POST requests to it from tools like Postman or cURL.
+                    </div>
+
                     <p className="text-slate-400 text-sm mb-4">
-                       Send POST requests with a valid JSON body to the URL below to create new leads in the system. This is a live endpoint.
+                       Send POST requests to the URL below to create new leads. Use the "Simulate" button to test payloads from within the app.
                     </p>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Your Live Webhook URL</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">Your Webhook URL</label>
                         <div className="flex items-center">
                             <input 
                                 type="text" 
@@ -116,6 +123,13 @@ const Settings: React.FC<SettingsProps> = ({ users, onOpenUserModal, onDeleteUse
                             </code>
                         </pre>
                     </div>
+                    <button 
+                        type="button"
+                        onClick={onSimulateWebhook}
+                        className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-500 transition-colors text-sm"
+                    >
+                        Simulate Inbound Lead
+                    </button>
                 </div>
             </div>
         </div>

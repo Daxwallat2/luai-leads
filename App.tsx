@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Page, Lead, Buyer, DeliveryLog, User } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -11,10 +11,14 @@ import Settings from './components/pages/Settings';
 import NewBuyerModal from './components/NewBuyerModal';
 import EditLeadModal from './components/EditLeadModal';
 import ConfirmationModal from './components/ConfirmationModal';
+import LoginPage from './components/pages/Login';
 import UserModal from './components/UserModal';
+import WebhookSimulationModal from './components/WebhookSimulationModal';
 import UpdateLeadsSentModal from './components/UpdateLeadsSentModal';
+import { db, loadAndSeedDB } from './db';
 
 const BuyerLeadsModal: React.FC<{buyer: Buyer; leads: Lead[]; deliveryLogs: DeliveryLog[]; onClose: () => void;}> = ({ buyer, leads, deliveryLogs, onClose }) => {
+    // This component remains largely the same, no changes needed.
     const [qualificationFilter, setQualificationFilter] = useState<'All' | 'Qualified' | 'Not Qualified'>('All');
     const buyerLeads = React.useMemo(() => {
         const deliveredLogEntries = deliveryLogs.filter(log => log.buyerId === buyer.id && log.status === 'Success');
@@ -75,14 +79,10 @@ const BuyerLeadsModal: React.FC<{buyer: Buyer; leads: Lead[]; deliveryLogs: Deli
     );
 };
 
+
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'u1',
-    name: 'Dax',
-    email: 'Dax@leadsupai.com',
-    role: 'Admin',
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [activePage, setActivePage] = useState<Page>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -91,6 +91,7 @@ const App: React.FC = () => {
   
   const [isBuyerModalOpen, setIsBuyerModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
   const [editingBuyer, setEditingBuyer] = useState<Buyer | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -101,43 +102,52 @@ const App: React.FC = () => {
   const [selectedBuyerIds, setSelectedBuyerIds] = useState<Set<string>>(new Set());
   const [deleteConfirmation, setDeleteConfirmation] = useState<{isOpen: boolean; itemType: string; count: number; onConfirm: () => void;}>
     ({ isOpen: false, itemType: 'item', count: 0, onConfirm: () => {} });
-  
+
   const loadData = useCallback(async () => {
-    setIsLoading(true);
     try {
-      const [usersRes, leadsRes, buyersRes, logsRes] = await Promise.all([
-        fetch('/api/users'), fetch('/api/leads'), fetch('/api/buyers'), fetch('/api/delivery-log')
-      ]);
       const [loadedUsers, loadedLeads, loadedBuyers, loadedLogs] = await Promise.all([
-        usersRes.json(), leadsRes.json(), buyersRes.json(), logsRes.json()
+        db.getUsers(), db.getLeads(), db.getBuyers(), db.getDeliveryLogs()
       ]);
       setUsers(loadedUsers);
       setLeads(loadedLeads);
       setBuyers(loadedBuyers);
       setDeliveryLog(loadedLogs);
     } catch (error) {
-      console.error("Failed to load data from API:", error);
+      console.error("Failed to load data from DB:", error);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
+    const init = async () => {
+        await loadAndSeedDB();
+        await loadData();
+    };
+    init();
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'DATA_UPDATED') {
+            console.log('Data updated by service worker, reloading.');
+            loadData();
+        }
+    };
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
   }, [loadData]);
 
-  const handleLogout = () => {
-      setCurrentUser(null);
-      // Reset state on logout
-      setUsers([]);
-      setLeads([]);
-      setBuyers([]);
-      setDeliveryLog([]);
-      setActivePage('dashboard');
-      setSelectedLeadIds(new Set());
-      setSelectedBuyerIds(new Set());
+
+  const handleLogin = (email: string, password_provided: string): boolean => {
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (user && user.password === password_provided) {
+          setCurrentUser(user);
+          return true;
+      }
+      return false;
   };
 
+  const handleLogout = () => setCurrentUser(null);
+  
   const handleCsvUpload = (file: File) => {
     setIsProcessingCsv(true);
     const reader = new FileReader();
@@ -155,16 +165,14 @@ const App: React.FC = () => {
           }, {} as Record<string, string>);
         });
         
-        // Sequentially send each lead to the webhook endpoint
         for (const leadData of dataRows) {
-            await fetch(`/api/webhook`, {
+            await fetch(`/api/v1/webhooks/in/u-csv-upload`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(leadData)
             });
         }
-        alert(`${dataRows.length} leads submitted for processing. The UI will refresh shortly.`);
-        await loadData(); // Refresh data after processing
+        alert(`${dataRows.length} leads are being processed via webhook. The UI will update as they complete.`);
       } catch (error) {
         console.error("Error processing CSV file:", error);
         alert("Failed to process CSV file.");
@@ -174,44 +182,57 @@ const App: React.FC = () => {
     };
     reader.readAsText(file);
   };
+  
+  const handleSimulateWebhook = () => setIsWebhookModalOpen(true);
+  
+  const handleProcessWebhookPayload = async (payload: string) => {
+    try {
+        const response = await fetch(`/api/v1/webhooks/in/u-simulation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+        });
+        if (!response.ok) throw new Error('Webhook processing failed in service worker.');
+        
+        setIsWebhookModalOpen(false);
+        alert(`A new lead has been received and is being processed! The UI will update shortly.`);
+        setActivePage('leads');
+    } catch (error) {
+        console.error("Error processing webhook payload:", error);
+        alert("Failed to process webhook payload. Please ensure it is valid JSON.");
+    }
+  };
 
   const handleSaveBuyer = async (buyerToSave: Buyer) => {
-    const isEditing = !!buyerToSave.id;
-    const url = isEditing ? `/api/buyers?id=${buyerToSave.id}` : '/api/buyers';
-    const method = isEditing ? 'PUT' : 'POST';
-
-    await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buyerToSave)
-    });
-    
+    if (editingBuyer) {
+        await db.putBuyer(buyerToSave);
+    } else {
+        const newBuyer: Buyer = {
+            ...buyerToSave,
+            id: `b${Date.now()}`,
+            leadsSentThisMonth: 0,
+            cycleStartDate: buyerToSave.cycleStartDate || new Date(new Date().setDate(1)).toISOString().split('T')[0]
+        };
+        await db.addBuyer(newBuyer);
+    }
     await loadData();
     setIsBuyerModalOpen(false);
     setEditingBuyer(null);
   };
 
   const handleSaveLead = async (updatedLead: Lead) => {
-      await fetch(`/api/leads?id=${updatedLead.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLead)
-      });
+      await db.putLead(updatedLead);
       await loadData();
       setEditingLead(null);
   };
 
   const handleSaveUser = async (userToSave: User) => {
-    const isEditing = !!userToSave.id;
-    const url = isEditing ? `/api/users?id=${userToSave.id}` : '/api/users';
-    const method = isEditing ? 'PUT' : 'POST';
-
-    await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userToSave)
-    });
-
+    if (editingUser) {
+        await db.putUser(userToSave);
+    } else {
+        const newUser: User = { ...userToSave, id: `u${Date.now()}` };
+        await db.addUser(newUser);
+    }
     await loadData();
     setIsUserModalOpen(false);
     setEditingUser(null);
@@ -221,7 +242,7 @@ const App: React.FC = () => {
     if (users.length <= 1) { alert("You cannot delete the only user."); return; }
     if (currentUser?.id === userId) { alert("You cannot delete yourself."); return; }
     setDeleteConfirmation({ isOpen: true, itemType: 'user', count: 1, onConfirm: async () => {
-        await fetch(`/api/users?id=${userId}`, { method: 'DELETE' });
+        await db.deleteUser(userId);
         await loadData();
         setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
     }});
@@ -229,11 +250,9 @@ const App: React.FC = () => {
 
   const handleDeleteSelectedLeads = () => {
     setDeleteConfirmation({ isOpen: true, itemType: 'lead', count: selectedLeadIds.size, onConfirm: async () => {
-        await fetch(`/api/leads`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: Array.from(selectedLeadIds) })
-        });
+        const ids = Array.from(selectedLeadIds);
+        await db.deleteLeads(ids);
+        await db.deleteLogsForLeads(ids);
         setSelectedLeadIds(new Set());
         await loadData();
         setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
@@ -242,11 +261,9 @@ const App: React.FC = () => {
   
   const handleDeleteSelectedBuyers = () => {
       setDeleteConfirmation({ isOpen: true, itemType: 'buyer', count: selectedBuyerIds.size, onConfirm: async () => {
-          await fetch(`/api/buyers`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: Array.from(selectedBuyerIds) })
-          });
+          const ids = Array.from(selectedBuyerIds);
+          await db.deleteBuyers(ids);
+          await db.deleteLogsForBuyers(ids);
           setSelectedBuyerIds(new Set());
           await loadData();
           setDeleteConfirmation({ isOpen: false, itemType: '', count: 0, onConfirm: () => {} });
@@ -254,7 +271,8 @@ const App: React.FC = () => {
   };
   
   const handleSimulateMonthEnd = async () => {
-    await fetch('/api/buyers/reset-monthly-counts', { method: 'POST' });
+    const updatedBuyers = buyers.map(b => ({ ...b, leadsSentThisMonth: 0 }));
+    await Promise.all(updatedBuyers.map(b => db.putBuyer(b)));
     await loadData();
     alert("Monthly lead counts for all buyers have been reset to 0.");
   };
@@ -270,40 +288,37 @@ const App: React.FC = () => {
       source: 'Internal Test', status: 'Not Qualified',
       address: '123 Test St, Testville, CA 90210', notes: ['This is a test lead.']
     };
-    await fetch(`/api/webhook`, {
+    await fetch(`/api/v1/webhooks/in/u-test-lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(testLeadPayload)
     });
-    alert(`Test lead sent to ${buyer.name}. Check the Delivery Log. The UI will refresh shortly.`);
-    await loadData();
+    alert(`Test lead sent to ${buyer.name}. Check the Delivery Log. The UI will update shortly.`);
   };
   
   const handleUpdateBuyerLeadsSent = async (buyerId: string, newCount: number) => {
       const buyer = buyers.find(b => b.id === buyerId);
       if (buyer) {
         const updatedCount = Math.max(0, Math.min(buyer.monthlyCap, newCount));
-        await fetch(`/api/buyers?id=${buyerId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...buyer, leadsSentThisMonth: updatedCount })
-        });
+        await db.putBuyer({ ...buyer, leadsSentThisMonth: updatedCount });
         await loadData();
       }
       setEditingBuyerLeadCount(null);
   };
 
   if (isLoading) {
-      return <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white"><p>Loading dashboard data...</p></div>;
+      return <div className="flex items-center justify-center min-h-screen"><p>Loading application...</p></div>;
   }
   
-  const pageToRender = (activePage === 'settings' && currentUser?.role !== 'Admin') ? 'dashboard' : activePage;
+  if (!currentUser) {
+      return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
     <div className="flex bg-slate-900 text-white min-h-screen font-sans">
-      <Sidebar activePage={activePage} setActivePage={setActivePage} user={currentUser} />
+      <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <main className="flex-1 ml-64">
-        <Header title={pageToRender} user={currentUser} onLogout={handleLogout} />
+        <Header title={activePage} user={currentUser} onLogout={handleLogout} />
         <div className="p-8">
           {
             {
@@ -312,8 +327,8 @@ const App: React.FC = () => {
               'buyers': <Buyers buyers={buyers} onOpenModal={(b) => { setEditingBuyer(b); setIsBuyerModalOpen(true); }} onSimulateMonthEnd={handleSimulateMonthEnd} onViewDetails={setViewingBuyerLeads} onSendTestLead={handleSendTestLead} onUpdateLeadsSent={setEditingBuyerLeadCount} selectedBuyerIds={selectedBuyerIds} onSelectionChange={(id, sel) => setSelectedBuyerIds(p => {const n=new Set(p); sel?n.add(id):n.delete(id); return n;})} onSelectAll={(sel) => setSelectedBuyerIds(sel ? new Set(buyers.map(b=>b.id)) : new Set())} onDeleteSelected={handleDeleteSelectedBuyers}/>,
               'delivery': <LeadDelivery deliveryLog={deliveryLog} leads={leads} buyers={buyers} />,
               'analytics': <Analytics />,
-              'settings': <Settings users={users} onOpenUserModal={(u) => { setEditingUser(u); setIsUserModalOpen(true); }} onDeleteUser={handleDeleteUser}/>,
-            }[pageToRender]
+              'settings': <Settings onSimulateWebhook={handleSimulateWebhook} users={users} onOpenUserModal={(u) => { setEditingUser(u); setIsUserModalOpen(true); }} onDeleteUser={handleDeleteUser}/>,
+            }[activePage]
           }
         </div>
       </main>
@@ -322,6 +337,7 @@ const App: React.FC = () => {
       {viewingBuyerLeads && <BuyerLeadsModal buyer={viewingBuyerLeads} leads={leads} deliveryLogs={deliveryLog} onClose={() => setViewingBuyerLeads(null)}/>}
       {editingLead && <EditLeadModal lead={editingLead} onClose={() => setEditingLead(null)} onSave={handleSaveLead} />}
       {deleteConfirmation.isOpen && (<ConfirmationModal isOpen={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation(p=>({...p,isOpen:false}))} onConfirm={deleteConfirmation.onConfirm} title={`Delete ${deleteConfirmation.itemType}(s)`} message={`Are you sure you want to delete ${deleteConfirmation.count} ${deleteConfirmation.itemType}(s)? This action cannot be undone.`}/>)}
+      {isWebhookModalOpen && <WebhookSimulationModal onClose={() => setIsWebhookModalOpen(false)} onProcess={handleProcessWebhookPayload} />}
       {editingBuyerLeadCount && <UpdateLeadsSentModal buyer={editingBuyerLeadCount} onClose={() => setEditingBuyerLeadCount(null)} onSave={handleUpdateBuyerLeadsSent}/>}
     </div>
   );

@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
 
 interface LoginPageProps {
-    onLogin: (email: string, pass: string) => Promise<boolean>;
+    onLogin: (email: string, pass: string) => boolean;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-    const [email, setEmail] = useState('Dax@leadsupai.com');
-    const [password, setPassword] = useState('Dinero81$');
+    const [email, setEmail] = useState('admin@luaileads.dev');
+    const [password, setPassword] = useState('password');
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        setIsLoading(true);
-        const success = await onLogin(email, password);
+        const success = onLogin(email, password);
         if (!success) {
             setError('Invalid email or password. Please try again.');
         }
-        setIsLoading(false);
     };
 
     return (
@@ -69,10 +66,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                     <div>
                         <button
                             type="submit"
-                            disabled={isLoading}
-                            className="w-full bg-brand-green text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-500 transition-colors duration-300 disabled:bg-slate-600 disabled:cursor-not-allowed"
+                            className="w-full bg-brand-green text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-500 transition-colors duration-300"
                         >
-                            {isLoading ? 'Signing in...' : 'Sign in'}
+                            Sign in
                         </button>
                     </div>
                 </form>

@@ -1,24 +1,21 @@
 import React from 'react';
-import type { Page, User } from '../types';
+import type { Page } from '../types';
 import { AnalyticsIcon, DashboardIcon, LeadsIcon, SettingsIcon, BuyerIcon, DeliveryIcon } from './Icons';
 
 interface SidebarProps {
   activePage: Page;
   setActivePage: (page: Page) => void;
-  user: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, user }) => {
-  const allNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['Admin', 'User'] },
-    { id: 'leads', label: 'Leads', icon: LeadsIcon, roles: ['Admin', 'User'] },
-    { id: 'buyers', label: 'Buyers', icon: BuyerIcon, roles: ['Admin', 'User'] },
-    { id: 'delivery', label: 'Delivery Log', icon: DeliveryIcon, roles: ['Admin', 'User'] },
-    { id: 'analytics', label: 'Analytics', icon: AnalyticsIcon, roles: ['Admin', 'User'] },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
+const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage }) => {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
+    { id: 'leads', label: 'Leads', icon: LeadsIcon },
+    { id: 'buyers', label: 'Buyers', icon: BuyerIcon },
+    { id: 'delivery', label: 'Delivery Log', icon: DeliveryIcon },
+    { id: 'analytics', label: 'Analytics', icon: AnalyticsIcon },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ] as const;
-
-  const navItems = allNavItems.filter(item => user && item.roles.includes(user.role));
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-700 flex flex-col h-screen fixed">
@@ -30,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, user }) =>
           {navItems.map((item) => (
             <li key={item.id}>
               <button
-                onClick={() => setActivePage(item.id as Page)}
+                onClick={() => setActivePage(item.id)}
                 className={`w-full flex items-center p-3 my-1 rounded-lg transition-colors duration-200 ${
                   activePage === item.id
                     ? 'bg-brand-green text-white'
