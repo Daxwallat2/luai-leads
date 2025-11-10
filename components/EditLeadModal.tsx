@@ -5,13 +5,11 @@ interface EditLeadModalProps {
     lead: Lead;
     onClose: () => void;
     onSave: (lead: Lead) => void;
-    onAdd: (lead: Omit<Lead, 'id'>) => void;
 }
 
-const EditLeadModal: React.FC<EditLeadModalProps> = ({ lead, onClose, onSave, onAdd }) => {
-    const [formData, setFormData] = useState<Partial<Lead>>({ ...lead });
+const EditLeadModal: React.FC<EditLeadModalProps> = ({ lead, onClose, onSave }) => {
+    const [formData, setFormData] = useState<Lead>({ ...lead });
     const [newNote, setNewNote] = useState('');
-    const isNewLead = !lead.id;
 
     useEffect(() => {
         setFormData({ ...lead });
@@ -27,7 +25,7 @@ const EditLeadModal: React.FC<EditLeadModalProps> = ({ lead, onClose, onSave, on
             const noteWithTimestamp = `${new Date().toLocaleString()}: ${newNote.trim()}`;
             setFormData(prev => ({
                 ...prev,
-                notes: [...(prev.notes || []), noteWithTimestamp]
+                notes: [...prev.notes, noteWithTimestamp]
             }));
             setNewNote('');
         }
@@ -35,25 +33,7 @@ const EditLeadModal: React.FC<EditLeadModalProps> = ({ lead, onClose, onSave, on
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (isNewLead) {
-            const newLeadData: Omit<Lead, 'id'> = {
-                name: formData.name || 'New Lead',
-                email: formData.email || '',
-                phone: formData.phone || '',
-                source: formData.source || 'Manual',
-                status: formData.status || 'Qualified',
-                deliveryStatus: 'Pending',
-                createdAt: new Date().toISOString(),
-                street: formData.street || '',
-                city: formData.city || '',
-                state: formData.state || '',
-                zipCode: formData.zipCode || '',
-                notes: formData.notes || [],
-            };
-            onAdd(newLeadData);
-        } else {
-            onSave(formData as Lead);
-        }
+        onSave(formData);
     };
 
     return (
@@ -61,29 +41,89 @@ const EditLeadModal: React.FC<EditLeadModalProps> = ({ lead, onClose, onSave, on
             <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-3xl h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
                     <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-white">{isNewLead ? 'Add New Lead' : `Edit Lead: ${lead.name}`}</h2>
+                        <h2 className="text-xl font-bold text-white">Edit Lead: {lead.name}</h2>
+                        <button type="button" onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
                     </div>
+
                     <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                        <div>
+                        {/* Contact Info */}
+                        <div className="border-b border-slate-700 pb-4">
+                            <h3 className="text-lg font-semibold text-brand-green mb-3">Contact Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-1">Name</label>
+                                    <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-1">Email</label>
+                                    <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-1">Phone</label>
+                                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Address Info */}
+                        <div className="border-b border-slate-700 pb-4">
                             <h3 className="text-lg font-semibold text-brand-green mb-3">Address</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-400 mb-1">Street</label>
-                                    <input type="text" name="street" value={formData.street || ''} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                    <input type="text" name="street" value={formData.street} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
                                 </div>
                                  <div>
                                     <label className="block text-sm font-medium text-slate-400 mb-1">City</label>
-                                    <input type="text" name="city" value={formData.city || ''} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                    <input type="text" name="city" value={formData.city} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
                                 </div>
                                  <div>
                                     <label className="block text-sm font-medium text-slate-400 mb-1">State</label>
-                                    <input type="text" name="state" value={formData.state || ''} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                    <input type="text" name="state" value={formData.state} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
                                 </div>
                                  <div>
                                     <label className="block text-sm font-medium text-slate-400 mb-1">Zip Code</label>
-                                    <input type="text" name="zipCode" value={formData.zipCode || ''} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                    <input type="text" name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Lead Info */}
+                        <div className="border-b border-slate-700 pb-4">
+                             <h3 className="text-lg font-semibold text-brand-green mb-3">Lead Details</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-1">Source</label>
+                                    <input type="text" name="source" value={formData.source} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"/>
+                                </div>
+                                 <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-1">Status</label>
+                                    <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green">
+                                        <option value="Qualified">Qualified</option>
+                                        <option value="Not Qualified">Not Qualified</option>
+                                    </select>
+                                </div>
+                             </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                             <h3 className="text-lg font-semibold text-brand-green mb-3">Notes</h3>
+                             <div className="space-y-2 max-h-40 overflow-y-auto bg-slate-900/50 p-3 rounded-md border border-slate-700">
+                                {formData.notes.length > 0 ? formData.notes.map((note, index) => (
+                                    <p key={index} className="text-sm text-slate-300 border-b border-slate-700 pb-1">{note}</p>
+                                )) : <p className="text-sm text-slate-500">No notes yet.</p>}
+                             </div>
+                             <div className="mt-3 flex gap-2">
+                                <input 
+                                    type="text"
+                                    value={newNote}
+                                    onChange={(e) => setNewNote(e.target.value)}
+                                    placeholder="Add a new note..."
+                                    className="flex-1 w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-green"
+                                />
+                                <button type="button" onClick={handleAddNote} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-500 transition-colors">Add Note</button>
+                             </div>
                         </div>
                     </div>
 

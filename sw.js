@@ -1,169 +1,113 @@
-// sw.js
+import { db } from './db.ts';
+import { parseAddressWithGemini } from './services/geminiService.ts';
+import type { Lead, Buyer, DeliveryLog } from './types.ts';
 
-const CACHE_NAME = 'luai-leads-cache-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/index.tsx',
-  // Note: Add other static assets here if you have them (e.g., CSS, images)
-];
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', () => self.clients.claim());
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
-});
-
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-
-  // If it's a webhook POST request, intercept it
   if (event.request.method === 'POST' && url.pathname.startsWith('/api/v1/webhooks/in/')) {
     event.respondWith(handleWebhook(event.request));
-  } else {
-    // For other requests, serve from cache or network
-    event.respondWith(
-      caches.match(event.request)
-        .then(response => {
-          if (response) {
-            return response;
-          }
-          return fetch(event.request);
-        })
-    );
   }
 });
 
 async function handleWebhook(request) {
   try {
     const leadData = await request.json();
+    const newLead = await processNewLeadData(leadData);
+    await db.addLead(newLead);
+    const log = await distributeLead(newLead);
+    await db.addDeliveryLog(log);
     
-    // We can't directly call the db.ts functions here because the service worker
-    // runs in a different context. We need to communicate with the client (the open tab).
-    const clients = await self.clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(client => client.postMessage({ type: 'DATA_UPDATED' }));
+
+    return new Response(JSON.stringify({ success: true, leadId: newLead.id }), {
+      headers: { 'Content-Type': 'application/json' }
     });
-
-    if (clients && clients.length > 0) {
-      // Send message to the first available client
-      clients[0].postMessage({
-        type: 'PROCESS_LEAD',
-        payload: leadData
-      });
-
-       // Also, let's process it here using IndexedDB directly if possible, for robustness
-       await processLeadInBackground(leadData);
-
-      return new Response(JSON.stringify({ success: true, message: 'Lead received and queued for processing.' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } else {
-      // If no client is open, we can still try to process it in the background
-      await processLeadInBackground(leadData);
-      return new Response(JSON.stringify({ success: true, message: 'Lead received for background processing.' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
   } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: 'Invalid JSON payload' }), {
-      status: 400,
+    console.error('Webhook Error:', error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
 }
 
-
-// --- Minimalistic IndexedDB logic duplicated for SW context ---
-// This ensures webhooks work even if the app tab is closed.
-
-const DB_NAME_SW = "luaiLeadsDB";
-const DB_VERSION_SW = 1;
-
-const openDB_SW = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME_SW, DB_VERSION_SW);
-    request.onsuccess = e => resolve(e.target.result);
-    request.onerror = e => reject(e.target.error);
-  });
+const processNewLeadData = async (leadData) => {
+  let structuredAddress = { street: leadData.street || '', city: leadData.city || '', state: leadData.state || '', zipCode: leadData.zipCode || '' };
+  if (leadData.address && !leadData.street) {
+    structuredAddress = await parseAddressWithGemini(leadData.address);
+  }
+  const allLeads = await db.getLeads();
+  const newLeadId = `lead-${Date.now()}-${allLeads.length}`;
+  
+  return {
+    id: newLeadId,
+    name: leadData.name || 'N/A',
+    email: leadData.email || 'N/A',
+    phone: leadData.phone || 'N/A',
+    source: leadData.source || 'Webhook',
+    status: leadData.status === 'Qualified' ? 'Qualified' : 'Not Qualified',
+    deliveryStatus: 'Pending',
+    date: new Date().toISOString().split('T')[0],
+    street: structuredAddress.street,
+    city: structuredAddress.city,
+    state: structuredAddress.state,
+    zipCode: structuredAddress.zipCode,
+    notes: Array.isArray(leadData.notes) ? leadData.notes : (leadData.notes ? [leadData.notes] : []),
+  };
 };
 
-async function processLeadInBackground(leadData) {
-    // This function mimics the logic from db.ts's processAndDistributeLead
-    // It is self-contained within the service worker
-    const db = await openDB_SW();
+const distributeLead = async (lead) => {
+  const buyers = await db.getBuyers();
+  const isLeadQualified = lead.status === 'Qualified';
 
-    const leadTx = db.transaction(['leads', 'buyers', 'delivery_logs'], 'readwrite');
-    const leadsStore = leadTx.objectStore('leads');
-    const buyersStore = leadTx.objectStore('buyers');
-    const logsStore = leadTx.objectStore('delivery_logs');
-    
-    const newLeadData = {
-        id: crypto.randomUUID(),
-        name: leadData.name || "Unknown",
-        email: leadData.email || "N/A",
-        phone: leadData.phone || "N/A",
-        source: leadData.source || "Webhook",
-        status: leadData.status || "Qualified",
-        deliveryStatus: 'Pending',
-        createdAt: new Date().toISOString(),
-        street: leadData.address || "", // Simplified for SW
-        city: "", state: "", zipCode: "",
-        notes: leadData.notes || []
+  const eligibleBuyers = buyers.filter(b => 
+    b.status === 'Active' &&
+    b.leadsSentThisMonth < b.monthlyCap &&
+    b.markets.includes(lead.state) &&
+    (b.leadQualificationPreference === 'Both' || 
+     (b.leadQualificationPreference === 'Qualified' && isLeadQualified) ||
+     (b.leadQualificationPreference === 'Not Qualified' && !isLeadQualified))
+  );
+
+  if (eligibleBuyers.length === 0) {
+    await db.putLead({ ...lead, deliveryStatus: 'Failed' });
+    return {
+      id: `dl-${lead.id}`, timestamp: new Date().toISOString(), leadId: lead.id,
+      buyerId: 'N/A', status: 'Failed', response: 'No eligible buyers found'
     };
+  }
+  
+  const buyer = eligibleBuyers[Math.floor(Math.random() * eligibleBuyers.length)];
 
-    leadsStore.add(newLeadData);
+  if (!buyer.webhookUrl) {
+    await db.putLead({ ...lead, deliveryStatus: 'Failed' });
+    return { id: `dl-${lead.id}`, timestamp: new Date().toISOString(), leadId: lead.id, buyerId: buyer.id, status: 'Failed', response: 'Buyer has no webhook URL' };
+  }
 
-    const buyers = await new Promise(resolve => {
-        const req = buyersStore.getAll();
-        req.onsuccess = () => resolve(req.result);
+  try {
+    const response = await fetch(buyer.webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lead),
+      mode: 'no-cors' // Use 'no-cors' for webhook testing to avoid CORS issues. Response will be opaque.
     });
 
-    const eligibleBuyers = buyers.filter(b => b.status === 'Active' && b.leadsSentThisMonth < b.monthlyCap);
+    const responseText = 'Opaque response due to "no-cors" mode.';
+    
+    // With no-cors, we can't check response.ok, so we assume success if fetch doesn't throw.
+    await db.putBuyer({ ...buyer, leadsSentThisMonth: buyer.leadsSentThisMonth + 1 });
+    await db.putLead({ ...lead, deliveryStatus: 'Delivered' });
+    return { id: `dl-${lead.id}`, timestamp: new Date().toISOString(), leadId: lead.id, buyerId: buyer.id, status: 'Success', response: responseText };
 
-    if (eligibleBuyers.length > 0) {
-        const buyer = eligibleBuyers[0]; // Simple logic: first come, first served
-        
-        // Update buyer
-        buyer.leadsSentThisMonth += 1;
-        const buyerTx = db.transaction('buyers', 'readwrite');
-        buyerTx.objectStore('buyers').put(buyer);
-
-        // Update lead
-        newLeadData.deliveryStatus = 'Delivered';
-        const leadUpdateTx = db.transaction('leads', 'readwrite');
-        leadUpdateTx.objectStore('leads').put(newLeadData);
-
-        // Add log
-        logsStore.add({ 
-            id: crypto.randomUUID(), 
-            timestamp: new Date().toISOString(), 
-            leadId: newLeadData.id, 
-            buyerId: buyer.id, 
-            status: 'Success', 
-            response: 'Processed in background' 
-        });
-
-    } else {
-        // Update lead
-        newLeadData.deliveryStatus = 'Failed';
-        const leadUpdateTx = db.transaction('leads', 'readwrite');
-        leadUpdateTx.objectStore('leads').put(newLeadData);
-        // Add log
-         logsStore.add({ 
-            id: crypto.randomUUID(), 
-            timestamp: new Date().toISOString(), 
-            leadId: newLeadData.id, 
-            buyerId: null, 
-            status: 'Failed', 
-            response: 'No eligible buyers in background' 
-        });
-    }
-}
+  } catch (error) {
+    await db.putLead({ ...lead, deliveryStatus: 'Failed' });
+    return {
+      id: `dl-${lead.id}`, timestamp: new Date().toISOString(), leadId: lead.id,
+      buyerId: buyer.id, status: 'Failed', response: `Network request failed: ${error.message}`
+    };
+  }
+};

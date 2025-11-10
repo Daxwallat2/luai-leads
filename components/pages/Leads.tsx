@@ -3,8 +3,9 @@ import type { Lead } from '../../types';
 
 interface LeadsPageProps {
     leads: Lead[];
+    onCsvUpload: (file: File) => void;
     onEditLead: (lead: Lead) => void;
-    onAddLead: () => void;
+    isProcessing: boolean;
     selectedLeadIds: Set<string>;
     onSelectionChange: (leadId: string, isSelected: boolean) => void;
     onSelectAll: (isSelected: boolean) => void;
@@ -20,14 +21,23 @@ const deliveryStatusColors: { [key in Lead['deliveryStatus']]: string } = {
 
 const Leads: React.FC<LeadsPageProps> = ({ 
     leads, 
+    onCsvUpload, 
     onEditLead, 
-    onAddLead,
+    isProcessing,
     selectedLeadIds,
     onSelectionChange,
     onSelectAll,
     onDeleteSelected
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onCsvUpload(file);
+        }
+        event.target.value = '';
+    };
 
     const filteredLeads = leads.filter(lead => {
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -39,7 +49,7 @@ const Leads: React.FC<LeadsPageProps> = ({
             lead.city.toLowerCase().includes(lowerSearchTerm) ||
             lead.zipCode.includes(lowerSearchTerm)
         );
-    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const areAllSelected = filteredLeads.length > 0 && filteredLeads.every(l => selectedLeadIds.has(l.id));
 
@@ -57,8 +67,8 @@ const Leads: React.FC<LeadsPageProps> = ({
                         </button>
                     )}
                 </div>
-                 <div className="flex items-center gap-4">
-                     <div className="relative">
+                <div className="flex items-center gap-4">
+                    <div className="relative">
                         <input
                             type="text"
                             placeholder="Search leads..."
@@ -70,9 +80,16 @@ const Leads: React.FC<LeadsPageProps> = ({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
-                    <button onClick={onAddLead} className="bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm">
-                        + New Lead
-                    </button>
+                     <label className={`bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        {isProcessing ? 'Processing...' : '+ Upload Leads'}
+                        <input
+                            type="file"
+                            accept=".csv"
+                            className="hidden"
+                            onChange={handleFileChange}
+                            disabled={isProcessing}
+                        />
+                    </label>
                 </div>
             </div>
              <div className="overflow-x-auto">
@@ -116,7 +133,7 @@ const Leads: React.FC<LeadsPageProps> = ({
                                         {lead.deliveryStatus}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>{new Date(lead.createdAt).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>{lead.date}</td>
                             </tr>
                         ))}
                     </tbody>

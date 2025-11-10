@@ -19,6 +19,7 @@ const UpdateLeadsSentModal: React.FC<UpdateLeadsSentModalProps> = ({ buyer, onCl
         if (isNaN(value)) {
             setCount(0);
         } else {
+            // Clamp the value between 0 and the monthly cap
             setCount(Math.max(0, Math.min(buyer.monthlyCap, value)));
         }
     };
@@ -56,6 +57,9 @@ const UpdateLeadsSentModal: React.FC<UpdateLeadsSentModalProps> = ({ buyer, onCl
                                     / {buyer.monthlyCap.toLocaleString()}
                                 </span>
                             </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Manually set the number of leads delivered in the current cycle.
+                            </p>
                         </div>
                     </div>
                     <div className="p-6 border-t border-slate-700 flex justify-end gap-4">
