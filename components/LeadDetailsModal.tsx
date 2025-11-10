@@ -34,8 +34,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onClose }) =>
                     <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
                 </div>
                 <div className="p-6 space-y-6 overflow-y-auto">
-                     {/* Contact Info */}
-                    <div className="border-b border-slate-700 pb-4">
+                     <div className="border-b border-slate-700 pb-4">
                         <h3 className="text-lg font-semibold text-brand-green mb-3">Contact Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <DetailItem label="Name" value={lead.name} />
@@ -43,7 +42,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onClose }) =>
                             <DetailItem label="Phone" value={lead.phone} />
                         </div>
                     </div>
-                    {/* Lead Info */}
                     <div className="border-b border-slate-700 pb-4">
                         <h3 className="text-lg font-semibold text-brand-green mb-3">Lead Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -58,11 +56,9 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onClose }) =>
                                     {lead.deliveryStatus}
                                 </span>
                             } />
-                             <DetailItem label="Date Received" value={lead.date} />
+                             <DetailItem label="Date Received" value={new Date(lead.createdAt).toLocaleDateString()} />
                         </div>
                     </div>
-
-                    {/* Address Info */}
                     <div>
                         <h3 className="text-lg font-semibold text-brand-green mb-3">Address</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

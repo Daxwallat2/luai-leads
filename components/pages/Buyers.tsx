@@ -5,9 +5,7 @@ import { EditIcon, SendIcon } from '../Icons';
 interface BuyersPageProps {
     buyers: Buyer[];
     onOpenModal: (buyer: Buyer | null) => void;
-    onSimulateMonthEnd: () => void;
     onViewDetails: (buyer: Buyer) => void;
-    onSendTestLead: (buyerId: string) => void;
     onUpdateLeadsSent: (buyer: Buyer) => void;
     selectedBuyerIds: Set<string>;
     onSelectionChange: (buyerId: string, isSelected: boolean) => void;
@@ -23,9 +21,7 @@ const statusStyles: { [key in Buyer['status']]: string } = {
 const Buyers: React.FC<BuyersPageProps> = ({ 
     buyers, 
     onOpenModal, 
-    onSimulateMonthEnd, 
     onViewDetails,
-    onSendTestLead,
     onUpdateLeadsSent,
     selectedBuyerIds,
     onSelectionChange,
@@ -49,9 +45,6 @@ const Buyers: React.FC<BuyersPageProps> = ({
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={onSimulateMonthEnd} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-500 transition-colors text-sm">
-                        Simulate Month End
-                    </button>
                     <button onClick={() => onOpenModal(null)} className="bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm">
                         + New Buyer
                     </button>
@@ -130,14 +123,6 @@ const Buyers: React.FC<BuyersPageProps> = ({
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        <button 
-                                            onClick={() => onSendTestLead(buyer.id)} 
-                                            className="text-slate-400 hover:text-blue-400 p-1 disabled:text-slate-600 disabled:cursor-not-allowed"
-                                            title="Send Test Lead"
-                                            disabled={!buyer.webhookUrl}
-                                        >
-                                            <SendIcon className="h-4 w-4" />
-                                        </button>
                                         <button onClick={() => onOpenModal(buyer)} className="text-slate-400 hover:text-brand-green p-1">
                                           <EditIcon className="h-4 w-4" />
                                         </button>

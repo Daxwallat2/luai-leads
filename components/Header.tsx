@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ title, user, onLogout }) => {
           <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-slate-900"></span>
         </button>
         <div className="flex items-center space-x-3">
-          <img src={`https://i.pravatar.cc/40?u=${user?.email}`} alt="User" className="h-10 w-10 rounded-full object-cover" />
+          <img src={`https://i.pravatar.cc/40?u=${user?.name}`} alt="User" className="h-10 w-10 rounded-full object-cover" />
           <div>
             <p className="text-white font-semibold text-sm">{user?.name || 'Guest'}</p>
             <p className="text-slate-400 text-xs">{user?.role || ''}</p>

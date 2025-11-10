@@ -6,15 +6,16 @@ interface SettingsProps {
     onSimulateWebhook: () => void;
     users: User[];
     onOpenUserModal: (user: User | null) => void;
-    onDeleteUser: (userId: string) => void;
+    currentUser: User;
 }
 
-const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUserModal, onDeleteUser }) => {
+const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUserModal, currentUser }) => {
     const [copied, setCopied] = useState(false);
     
+    // This URL is intercepted by the service worker in the browser
     const webhookUrl = useMemo(() => {
-        // This now points to a real serverless function, not the service worker.
-        return `${window.location.origin}/api/webhook`;
+        const url = new URL('/api/v1/webhooks/in/u-AbCdEfG12345', window.location.origin);
+        return url.toString();
     }, []);
 
     const handleCopy = () => {
@@ -28,14 +29,13 @@ const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUse
         <div className="bg-slate-800 p-8 rounded-lg border border-slate-700">
             <h3 className="text-2xl font-bold text-white mb-6">Settings</h3>
             <div className="space-y-10">
-                 {/* User Management */}
                 <div>
                     <div className="flex items-center justify-between mb-4">
                          <div className="flex items-center gap-3">
                              <UserGroupIcon className="h-6 w-6 text-brand-green"/>
                             <h4 className="text-xl font-semibold text-white">User Management</h4>
                          </div>
-                        <button onClick={() => onOpenUserModal(null)} className="bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm">
+                         <button onClick={() => onOpenUserModal(null)} className="bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm">
                             + Add User
                         </button>
                     </div>
@@ -44,7 +44,6 @@ const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUse
                             <thead className="text-xs text-slate-400 uppercase bg-slate-700/50">
                                 <tr>
                                     <th scope="col" className="px-6 py-3">Name</th>
-                                    <th scope="col" className="px-6 py-3">Email</th>
                                     <th scope="col" className="px-6 py-3">Role</th>
                                     <th scope="col" className="px-6 py-3 text-right">Actions</th>
                                 </tr>
@@ -52,18 +51,12 @@ const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUse
                             <tbody>
                                 {users.map((user) => (
                                     <tr key={user.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                                        <td className="px-6 py-4 font-medium text-white">{user.name}</td>
-                                        <td className="px-6 py-4">{user.email}</td>
+                                        <td className="px-6 py-4 font-medium text-white">{user.name} {user.id === currentUser.id && '(You)'}</td>
                                         <td className="px-6 py-4">{user.role}</td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-4">
-                                                <button onClick={() => onOpenUserModal(user)} className="text-slate-400 hover:text-brand-green p-1">
-                                                    <EditIcon className="h-4 w-4" />
-                                                </button>
-                                                 <button onClick={() => onDeleteUser(user.id)} className="text-slate-400 hover:text-red-500 p-1">
-                                                    &times;
-                                                </button>
-                                            </div>
+                                            <button onClick={() => onOpenUserModal(user)} className="text-slate-400 hover:text-brand-green p-1">
+                                                <EditIcon className="h-4 w-4" />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -72,16 +65,10 @@ const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUse
                     </div>
                 </div>
 
-                {/* Webhook */}
                  <div className="border-t border-slate-700 pt-8">
                     <h4 className="text-lg font-semibold text-white mb-4">Webhook Integration</h4>
-                    
-                    <div className="bg-blue-500/10 border border-blue-500/30 text-blue-300 text-sm rounded-lg p-4 mb-6">
-                        <strong className="font-semibold">Live Backend Active:</strong> This application uses a Vercel Serverless Function to handle incoming leads. The URL below is a permanent, live API endpoint.
-                    </div>
-
                     <p className="text-slate-400 text-sm mb-4">
-                       Send POST requests to the URL below to create new leads. Use the "Simulate" button to test payloads from within the app.
+                       This is a simulated webhook endpoint handled by a browser Service Worker. As long as this tab is open, you can send POST requests to this URL to create leads.
                     </p>
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-slate-400 mb-1">Your Webhook URL</label>
@@ -100,28 +87,6 @@ const Settings: React.FC<SettingsProps> = ({ onSimulateWebhook, users, onOpenUse
                                 {copied ? 'Copied!' : 'Copy'}
                             </button>
                         </div>
-                    </div>
-                    <div className="mb-4">
-                        <p className="text-sm text-slate-400 mb-2">Send a POST request with a JSON body like this:</p>
-                        <pre className="bg-slate-900 p-4 rounded-md text-xs text-slate-300 overflow-x-auto">
-                            <code>
-{`{
-  "name": "John Smith",
-  "email": "john.smith@example.com",
-  "phone": "(555) 555-5555",
-  "source": "My Awesome Website",
-  "status": "Qualified", // Optional: "Qualified" or "Not Qualified". Defaults to "Not Qualified".
-  "notes": ["This is an example note."],
-  // Use a single line for AI parsing...
-  "address": "123 Awesome St, Austin, TX 78701"
-  // ...OR provide structured fields:
-  // "street": "123 Awesome St",
-  // "city": "Austin",
-  // "state": "Texas",
-  // "zipCode": "78701"
-}`}
-                            </code>
-                        </pre>
                     </div>
                     <button 
                         type="button"

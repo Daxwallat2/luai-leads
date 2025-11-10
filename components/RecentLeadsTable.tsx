@@ -34,7 +34,7 @@ const RecentLeadsTable: React.FC<RecentLeadsTableProps> = ({ leads }) => {
                     {lead.status}
                   </span>
                 </td>
-                <td className="px-6 py-4">{lead.date}</td>
+                <td className="px-6 py-4">{new Date(lead.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>

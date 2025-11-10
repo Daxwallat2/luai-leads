@@ -29,9 +29,7 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.81.0",
-    "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.5"
+    "react": "https://aistudiocdn.com/react@^19.2.0"
   }
 }
 </script>
@@ -39,5 +37,18 @@
   <body class="bg-slate-900 text-slate-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(error => {
+              console.log('ServiceWorker registration failed: ', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
