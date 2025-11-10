@@ -87,7 +87,6 @@ const initialDeliveryLogs = generateMockDeliveryLogs(initialLeads, initialBuyers
 
 // --- DB Initialization and Seeding ---
 
-// FIX: Renamed `db` to `dbInstance` to avoid redeclaration error with exported `db` object.
 let dbInstance: IDBDatabase;
 
 const initDB = (): Promise<IDBDatabase> => {
@@ -182,6 +181,18 @@ const deleteStoreData = (storeName: string, id: string): Promise<void> => {
     });
 }
 
+const deleteMultipleStoreData = (storeName: string, ids: string[]): Promise<void> => {
+    if (ids.length === 0) return Promise.resolve();
+    return new Promise(async (resolve, reject) => {
+        const db = await initDB();
+        const transaction = db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        ids.forEach(id => store.delete(id));
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
+
 export const db = {
     getUsers: () => getStoreData<User>('users'),
     addUser: (user: User) => addStoreData('users', user),
@@ -191,23 +202,25 @@ export const db = {
     getLeads: () => getStoreData<Lead>('leads'),
     addLead: (lead: Lead) => addStoreData('leads', lead),
     putLead: (lead: Lead) => putStoreData('leads', lead),
-    deleteLeads: (ids: string[]) => Promise.all(ids.map(id => deleteStoreData('leads', id))),
+    deleteLeads: (ids: string[]) => deleteMultipleStoreData('leads', ids),
 
     getBuyers: () => getStoreData<Buyer>('buyers'),
     addBuyer: (buyer: Buyer) => addStoreData('buyers', buyer),
     putBuyer: (buyer: Buyer) => putStoreData('buyers', buyer),
-    deleteBuyers: (ids: string[]) => Promise.all(ids.map(id => deleteStoreData('buyers', id))),
+    deleteBuyers: (ids: string[]) => deleteMultipleStoreData('buyers', ids),
 
     getDeliveryLogs: () => getStoreData<DeliveryLog>('deliveryLog'),
     addDeliveryLog: (log: DeliveryLog) => addStoreData('deliveryLog', log),
-    deleteLogsForLeads: async (leadIds: string[]) => {
+    deleteLogsForLeads: async (leadIds: string[]): Promise<void> => {
+        if (leadIds.length === 0) return;
         const logs = await getStoreData<DeliveryLog>('deliveryLog');
-        const logsToDelete = logs.filter(log => leadIds.includes(log.leadId));
-        return Promise.all(logsToDelete.map(log => deleteStoreData('deliveryLog', log.id)));
+        const logsToDeleteIds = logs.filter(log => leadIds.includes(log.leadId)).map(log => log.id);
+        await deleteMultipleStoreData('deliveryLog', logsToDeleteIds);
     },
-     deleteLogsForBuyers: async (buyerIds: string[]) => {
+    deleteLogsForBuyers: async (buyerIds: string[]): Promise<void> => {
+        if (buyerIds.length === 0) return;
         const logs = await getStoreData<DeliveryLog>('deliveryLog');
-        const logsToDelete = logs.filter(log => log.buyerId && buyerIds.includes(log.buyerId));
-        return Promise.all(logsToDelete.map(log => deleteStoreData('deliveryLog', log.id)));
+        const logsToDeleteIds = logs.filter(log => log.buyerId && buyerIds.includes(log.buyerId)).map(log => log.id);
+        await deleteMultipleStoreData('deliveryLog', logsToDeleteIds);
     },
 };

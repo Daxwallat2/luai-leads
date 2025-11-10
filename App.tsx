@@ -121,8 +121,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
+      try {
         await loadAndSeedDB();
         await loadData();
+      } catch (error) {
+        console.error("Failed to initialize database and load data:", error);
+        // Ensure we don't get stuck on a loading screen if init fails
+        setIsLoading(false);
+      }
     };
     init();
 
@@ -250,7 +256,8 @@ const App: React.FC = () => {
 
   const handleDeleteSelectedLeads = () => {
     setDeleteConfirmation({ isOpen: true, itemType: 'lead', count: selectedLeadIds.size, onConfirm: async () => {
-        const ids = Array.from(selectedLeadIds);
+        // Fix: Explicitly type `ids` as string[] to resolve TypeScript inference issue.
+        const ids: string[] = Array.from(selectedLeadIds);
         await db.deleteLeads(ids);
         await db.deleteLogsForLeads(ids);
         setSelectedLeadIds(new Set());
@@ -261,7 +268,8 @@ const App: React.FC = () => {
   
   const handleDeleteSelectedBuyers = () => {
       setDeleteConfirmation({ isOpen: true, itemType: 'buyer', count: selectedBuyerIds.size, onConfirm: async () => {
-          const ids = Array.from(selectedBuyerIds);
+          // Fix: Explicitly type `ids` as string[] to resolve TypeScript inference issue.
+          const ids: string[] = Array.from(selectedBuyerIds);
           await db.deleteBuyers(ids);
           await db.deleteLogsForBuyers(ids);
           setSelectedBuyerIds(new Set());
