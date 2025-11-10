@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LUAILeads Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-green': '#10b981',
+              'slate-900': '#0f172a',
+              'slate-800': '#1e293b',
+              'slate-700': '#334155',
+              'slate-600': '#475569',
+              'slate-400': '#94a3b8',
+              'slate-300': '#cbd5e1',
+            },
+          },
+        },
+      }
+    </script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@vercel/postgres": "https://aistudiocdn.com/@vercel/postgres@^0.10.0",
+    "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.5"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-900 text-slate-300">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

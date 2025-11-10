@@ -1,0 +1,5 @@
+{
+  "name": "LUAILeads",
+  "description": "A sophisticated dashboard for managing and analyzing lead generation campaigns, inspired by LeadProsper.io. It features data visualization, lead tracking, and AI-powered analytics summaries using the Gemini API.",
+  "requestFramePermissions": []
+}
