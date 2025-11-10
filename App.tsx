@@ -11,7 +11,6 @@ import Settings from './components/pages/Settings';
 import NewBuyerModal from './components/NewBuyerModal';
 import EditLeadModal from './components/EditLeadModal';
 import ConfirmationModal from './components/ConfirmationModal';
-import LoginPage from './components/pages/Login';
 import UserModal from './components/UserModal';
 import WebhookSimulationModal from './components/WebhookSimulationModal';
 import UpdateLeadsSentModal from './components/UpdateLeadsSentModal';
@@ -79,10 +78,16 @@ const BuyerLeadsModal: React.FC<{buyer: Buyer; leads: Lead[]; deliveryLogs: Deli
     );
 };
 
+// Create a mock user to bypass the login screen.
+const mockCurrentUser: User = {
+  id: 'u1',
+  name: 'Admin User',
+  email: 'admin@luaileads.dev',
+  role: 'Admin'
+};
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [activePage, setActivePage] = useState<Page>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -141,18 +146,6 @@ const App: React.FC = () => {
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
   }, [loadData]);
-
-
-  const handleLogin = (email: string, password_provided: string): boolean => {
-      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (user && user.password === password_provided) {
-          setCurrentUser(user);
-          return true;
-      }
-      return false;
-  };
-
-  const handleLogout = () => setCurrentUser(null);
   
   const handleCsvUpload = (file: File) => {
     setIsProcessingCsv(true);
@@ -246,7 +239,7 @@ const App: React.FC = () => {
   
   const handleDeleteUser = async (userId: string) => {
     if (users.length <= 1) { alert("You cannot delete the only user."); return; }
-    if (currentUser?.id === userId) { alert("You cannot delete yourself."); return; }
+    if (mockCurrentUser?.id === userId) { alert("You cannot delete yourself."); return; }
     setDeleteConfirmation({ isOpen: true, itemType: 'user', count: 1, onConfirm: async () => {
         await db.deleteUser(userId);
         await loadData();
@@ -317,16 +310,12 @@ const App: React.FC = () => {
   if (isLoading) {
       return <div className="flex items-center justify-center min-h-screen"><p>Loading application...</p></div>;
   }
-  
-  if (!currentUser) {
-      return <LoginPage onLogin={handleLogin} />;
-  }
 
   return (
     <div className="flex bg-slate-900 text-white min-h-screen font-sans">
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <main className="flex-1 ml-64">
-        <Header title={activePage} user={currentUser} onLogout={handleLogout} />
+        <Header title={activePage} user={mockCurrentUser} onLogout={() => { /* Logout disabled */ }} />
         <div className="p-8">
           {
             {

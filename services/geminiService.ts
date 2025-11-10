@@ -1,7 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { DailyLeads, LeadsBySource } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI;
+
+const getAiClient = (): GoogleGenAI => {
+    if (!ai) {
+        // Lazily initialize the client to prevent app crashes on load if the
+        // API key is not available or invalid.
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+}
 
 interface ParsedAddress {
     street: string;
@@ -14,7 +23,8 @@ export const parseAddressWithGemini = async (address: string): Promise<ParsedAdd
   const prompt = `Parse the following address into a structured JSON object with keys for "street", "city", "state", and "zipCode". The state should be the full state name. Address: "${address}"`;
   
   try {
-     const response = await ai.models.generateContent({
+     const client = getAiClient();
+     const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -63,7 +73,8 @@ export const generateAnalyticsSummary = async (dailyData: DailyLeads[], sourceDa
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const client = getAiClient();
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
     });
