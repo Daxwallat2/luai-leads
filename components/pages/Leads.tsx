@@ -3,14 +3,16 @@ import type { Lead } from '../../types';
 
 interface LeadsPageProps {
     leads: Lead[];
+    onCsvUpload: (file: File) => void;
     onEditLead: (lead: Lead) => void;
+    isProcessing: boolean;
     selectedLeadIds: Set<string>;
     onSelectionChange: (leadId: string, isSelected: boolean) => void;
     onSelectAll: (isSelected: boolean) => void;
     onDeleteSelected: () => void;
 }
 
-const deliveryStatusColors: { [key in Lead['delivery_status']]: string } = {
+const deliveryStatusColors: { [key in Lead['deliveryStatus']]: string } = {
   Pending: 'bg-slate-500/20 text-slate-400',
   Queued: 'bg-cyan-500/20 text-cyan-400',
   Delivered: 'bg-green-500/20 text-green-400',
@@ -19,13 +21,23 @@ const deliveryStatusColors: { [key in Lead['delivery_status']]: string } = {
 
 const Leads: React.FC<LeadsPageProps> = ({ 
     leads, 
+    onCsvUpload, 
     onEditLead, 
+    isProcessing,
     selectedLeadIds,
     onSelectionChange,
     onSelectAll,
     onDeleteSelected
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onCsvUpload(file);
+        }
+        event.target.value = '';
+    };
 
     const filteredLeads = leads.filter(lead => {
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -35,11 +47,11 @@ const Leads: React.FC<LeadsPageProps> = ({
             lead.phone.replace(/[()\s-]/g, '').includes(lowerSearchTerm) ||
             lead.street.toLowerCase().includes(lowerSearchTerm) ||
             lead.city.toLowerCase().includes(lowerSearchTerm) ||
-            lead.zip_code.includes(lowerSearchTerm)
+            lead.zipCode.includes(lowerSearchTerm)
         );
-    }).sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const areAllSelected = filteredLeads.length > 0 && filteredLeads.every(l => selectedLeadIds.has(l.id!));
+    const areAllSelected = filteredLeads.length > 0 && filteredLeads.every(l => selectedLeadIds.has(l.id));
 
     return (
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
@@ -55,17 +67,29 @@ const Leads: React.FC<LeadsPageProps> = ({
                         </button>
                     )}
                 </div>
-                <div className="relative">
-                    <input
-                        type="text"
-                        placeholder="Search leads..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-slate-700 border border-slate-600 text-white placeholder-slate-400 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-green"
-                    />
-                    <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Search leads..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-slate-700 border border-slate-600 text-white placeholder-slate-400 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                        />
+                        <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                     <label className={`bg-brand-green text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-500 transition-colors text-sm cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        {isProcessing ? 'Processing...' : '+ Upload Leads'}
+                        <input
+                            type="file"
+                            accept=".csv"
+                            className="hidden"
+                            onChange={handleFileChange}
+                            disabled={isProcessing}
+                        />
+                    </label>
                 </div>
             </div>
              <div className="overflow-x-auto">
@@ -91,25 +115,25 @@ const Leads: React.FC<LeadsPageProps> = ({
                         {filteredLeads.map((lead) => (
                             <tr
                               key={lead.id}
-                              className={`border-b border-slate-700 hover:bg-slate-700/50 ${selectedLeadIds.has(lead.id!) ? 'bg-slate-700/50' : ''}`}
+                              className={`border-b border-slate-700 hover:bg-slate-700/50 ${selectedLeadIds.has(lead.id) ? 'bg-slate-700/50' : ''}`}
                             >
                                 <td className="p-4">
                                      <input 
                                         type="checkbox"
                                         className="form-checkbox h-4 w-4 rounded bg-slate-600 border-slate-500 text-brand-green focus:ring-brand-green"
-                                        checked={selectedLeadIds.has(lead.id!)}
-                                        onChange={(e) => onSelectionChange(lead.id!, e.target.checked)}
+                                        checked={selectedLeadIds.has(lead.id)}
+                                        onChange={(e) => onSelectionChange(lead.id, e.target.checked)}
                                     />
                                 </td>
                                 <td className="px-6 py-4 font-medium text-white whitespace-nowrap cursor-pointer" onClick={() => onEditLead(lead)}>{lead.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => onEditLead(lead)}>{`${lead.street}, ${lead.city}, ${lead.state} ${lead.zip_code}`}</td>
+                                <td className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => onEditLead(lead)}>{`${lead.street}, ${lead.city}, ${lead.state} ${lead.zipCode}`}</td>
                                 <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>{lead.source}</td>
                                 <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${deliveryStatusColors[lead.delivery_status]}`}>
-                                        {lead.delivery_status}
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${deliveryStatusColors[lead.deliveryStatus]}`}>
+                                        {lead.deliveryStatus}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>{new Date(lead.created_at!).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 cursor-pointer" onClick={() => onEditLead(lead)}>{lead.date}</td>
                             </tr>
                         ))}
                     </tbody>

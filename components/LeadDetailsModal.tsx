@@ -6,7 +6,7 @@ const statusColors: { [key in Lead['status']]: string } = {
   'Not Qualified': 'bg-red-500/20 text-red-400',
 };
 
-const deliveryStatusColors: { [key in Lead['delivery_status']]: string } = {
+const deliveryStatusColors: { [key in Lead['deliveryStatus']]: string } = {
   Pending: 'bg-slate-500/20 text-slate-400',
   Queued: 'bg-cyan-500/20 text-cyan-400',
   Delivered: 'bg-green-500/20 text-green-400',
@@ -34,30 +34,49 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onClose }) =>
                     <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
                 </div>
                 <div className="p-6 space-y-6 overflow-y-auto">
-                     <div className="border-b border-slate-700 pb-4">
+                     {/* Contact Info */}
+                    <div className="border-b border-slate-700 pb-4">
+                        <h3 className="text-lg font-semibold text-brand-green mb-3">Contact Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <DetailItem label="Name" value={lead.name} />
                             <DetailItem label="Email" value={lead.email} />
                             <DetailItem label="Phone" value={lead.phone} />
-                             <DetailItem label="Source" value={lead.source} />
-                             <DetailItem label="Status" value={<span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[lead.status]}`}>{lead.status}</span>} />
-                            <DetailItem label="Delivery Status" value={<span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatusColors[lead.delivery_status]}`}>{lead.delivery_status}</span>} />
-                             <DetailItem label="Date Received" value={new Date(lead.created_at!).toLocaleString()} />
+                        </div>
+                    </div>
+                    {/* Lead Info */}
+                    <div className="border-b border-slate-700 pb-4">
+                        <h3 className="text-lg font-semibold text-brand-green mb-3">Lead Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <DetailItem label="Source" value={lead.source} />
+                             <DetailItem label="Status" value={
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[lead.status]}`}>
+                                    {lead.status}
+                                </span>
+                            } />
+                            <DetailItem label="Delivery Status" value={
+                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${deliveryStatusColors[lead.deliveryStatus]}`}>
+                                    {lead.deliveryStatus}
+                                </span>
+                            } />
+                             <DetailItem label="Date Received" value={lead.date} />
                         </div>
                     </div>
 
+                    {/* Address Info */}
                     <div>
                         <h3 className="text-lg font-semibold text-brand-green mb-3">Address</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <DetailItem label="Street" value={lead.street} />
                             <DetailItem label="City" value={lead.city} />
                             <DetailItem label="State" value={lead.state} />
-                            <DetailItem label="Zip Code" value={lead.zip_code} />
+                            <DetailItem label="Zip Code" value={lead.zipCode} />
                         </div>
                     </div>
                 </div>
                 <div className="p-4 border-t border-slate-700 flex justify-end">
-                    <button onClick={onClose} className="bg-slate-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-slate-500 transition-colors">Close</button>
+                    <button onClick={onClose} className="bg-slate-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-slate-500 transition-colors">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>

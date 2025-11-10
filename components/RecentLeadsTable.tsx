@@ -34,8 +34,7 @@ const RecentLeadsTable: React.FC<RecentLeadsTableProps> = ({ leads }) => {
                     {lead.status}
                   </span>
                 </td>
-                {/* FIX: Use `created_at` property instead of non-existent `date` property and format it. */}
-                <td className="px-6 py-4">{new Date(lead.created_at!).toLocaleDateString()}</td>
+                <td className="px-6 py-4">{lead.date}</td>
               </tr>
             ))}
           </tbody>

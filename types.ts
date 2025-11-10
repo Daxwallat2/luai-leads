@@ -1,50 +1,47 @@
-// types.ts
+// Fix: Define all necessary types for the application to resolve import errors.
 export type Page = 'dashboard' | 'leads' | 'buyers' | 'delivery' | 'analytics' | 'settings';
 
-// Represents the public user profile stored in Supabase
-export interface UserProfile {
-  id: string; // Corresponds to the auth.users id
-  full_name: string;
-  email: string; // Stored for convenience, but auth.users is the source of truth
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string; // Password is for simulation, optional on the type
   role: 'Admin' | 'User';
-  updated_at?: string;
-  avatar_url?: string;
 }
 
 export interface Lead {
-  id?: string; // Optional for new leads
+  id: string;
   name: string;
   email: string;
   phone: string;
   source: string;
   status: 'Qualified' | 'Not Qualified';
-  delivery_status: 'Pending' | 'Queued' | 'Delivered' | 'Failed';
-  created_at?: string;
+  deliveryStatus: 'Pending' | 'Queued' | 'Delivered' | 'Failed';
+  date: string;
   street: string;
   city: string;
   state: string;
-  zip_code: string;
+  zipCode: string;
   notes: string[];
 }
 
 export interface Buyer {
-    id?: string; // Optional for new buyers
+    id: string;
     name: string;
     status: 'Active' | 'Inactive';
-    webhook_url: string;
-    monthly_cap: number;
-    leads_sent_this_month: number;
-    cycle_start_date: string;
-    markets: string[]; // Array of state names
-    lead_qualification_preference: 'Qualified' | 'Not Qualified' | 'Both';
-    user_id?: string; // Foreign key to auth.users
+    webhookUrl: string;
+    monthlyCap: number;
+    leadsSentThisMonth: number;
+    cycleStartDate: string;
+    markets: string[];
+    leadQualificationPreference: 'Qualified' | 'Not Qualified' | 'Both';
 }
 
 export interface DeliveryLog {
-    id?: string;
-    created_at?: string;
-    lead_id: string;
-    buyer_id: string | null;
+    id: string;
+    timestamp: string;
+    leadId: string;
+    buyerId: string;
     status: 'Success' | 'Failed';
     response: string;
 }
@@ -59,6 +56,17 @@ export interface LeadsBySource {
     value: number;
 }
 
+export interface Campaign {
+    id: string;
+    name: string;
+    status: 'Active' | 'Paused' | 'Completed';
+    leads: number;
+    cost: number;
+    cpl: number;
+}
+
+// Fix: Add a global type declaration for the Recharts library, which is loaded from a CDN.
+// This resolves 'Property 'Recharts' does not exist on type 'Window & typeof globalThis'' errors.
 declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

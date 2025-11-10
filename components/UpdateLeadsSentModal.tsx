@@ -8,10 +8,10 @@ interface UpdateLeadsSentModalProps {
 }
 
 const UpdateLeadsSentModal: React.FC<UpdateLeadsSentModalProps> = ({ buyer, onClose, onSave }) => {
-    const [count, setCount] = useState(buyer.leads_sent_this_month);
+    const [count, setCount] = useState(buyer.leadsSentThisMonth);
 
     useEffect(() => {
-        setCount(buyer.leads_sent_this_month);
+        setCount(buyer.leadsSentThisMonth);
     }, [buyer]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,13 +19,14 @@ const UpdateLeadsSentModal: React.FC<UpdateLeadsSentModalProps> = ({ buyer, onCl
         if (isNaN(value)) {
             setCount(0);
         } else {
-            setCount(Math.max(0, Math.min(buyer.monthly_cap, value)));
+            // Clamp the value between 0 and the monthly cap
+            setCount(Math.max(0, Math.min(buyer.monthlyCap, value)));
         }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(buyer.id!, count);
+        onSave(buyer.id, count);
     };
 
     return (
@@ -48,19 +49,26 @@ const UpdateLeadsSentModal: React.FC<UpdateLeadsSentModalProps> = ({ buyer, onCl
                                     value={count}
                                     onChange={handleChange}
                                     min="0"
-                                    max={buyer.monthly_cap}
+                                    max={buyer.monthlyCap}
                                     className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-brand-green"
                                     autoFocus
                                 />
                                 <span className="absolute inset-y-0 right-4 flex items-center text-slate-400 font-mono text-lg">
-                                    / {buyer.monthly_cap.toLocaleString()}
+                                    / {buyer.monthlyCap.toLocaleString()}
                                 </span>
                             </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Manually set the number of leads delivered in the current cycle.
+                            </p>
                         </div>
                     </div>
                     <div className="p-6 border-t border-slate-700 flex justify-end gap-4">
-                        <button type="button" onClick={onClose} className="bg-slate-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-slate-500 transition-colors">Cancel</button>
-                        <button type="submit" className="bg-brand-green text-white font-bold py-2 px-5 rounded-lg hover:bg-emerald-500 transition-colors">Save Changes</button>
+                        <button type="button" onClick={onClose} className="bg-slate-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-slate-500 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" className="bg-brand-green text-white font-bold py-2 px-5 rounded-lg hover:bg-emerald-500 transition-colors">
+                            Save Changes
+                        </button>
                     </div>
                 </form>
             </div>
